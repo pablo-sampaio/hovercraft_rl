@@ -1,0 +1,17 @@
+name: hovercraft-rl
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy>=1.26
+  - libblas=*=*openblas   # MKL 2026 do conda-forge derruba o numpy em algumas CPUs (0xc06d007f)
+  - scipy>=1.11
+  - matplotlib>=3.8
+  - pytest>=8
+  - pip
+  - pip:
+      - gymnasium>=1.0
+      - pygame>=2.5
+      - stable-baselines3>=2.3
+      - torch>=2.2
+      - tensorboard

@@ -1,0 +1,26 @@
+
+Do mais difícil para o mais fácil:
+
+(Do artigo)
+BETA_V = 0.20
+BETA_U = 0.00
+BETA_R = 0.00
+
+BETA_V = 0.30
+BETA_U = 0.05
+BETA_R = 0.05
+
+(menos realista, desafiador, mas bem mais controlável)
+BETA_V = 0.50
+BETA_U = 0.10
+BETA_R = 0.20
+
+(sugestão do Claude, menos realista, razoavelmente controlável)
+BETA_V = 0.80
+BETA_U = 0.15
+BETA_R = 0.50
+
+(extrapola a sugestão do Claude, deixando mais controlável)
+BETA_V = 1.00
+BETA_U = 0.15
+BETA_R = 0.70

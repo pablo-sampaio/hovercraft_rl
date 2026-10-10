@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hovercraft-rl"
+version = "0.1.0"
+description = "Simulador, visualizador e ambiente Gymnasium para controle de hovercraft subatuado com RL"
+requires-python = ">=3.10"
+dependencies = ["numpy", "gymnasium>=1.0", "pygame>=2.5"]
+
+[project.optional-dependencies]
+train = ["stable-baselines3>=2.3", "torch", "tensorboard"]
+dev = ["pytest", "matplotlib"]
+
+[project.scripts]
+hovercraft-play = "hovercraft_rl.game.play:main"
+
+[tool.setuptools.packages.find]
+include = ["hovercraft_rl*"]
+
+[tool.setuptools.package-data]
+"hovercraft_rl.track" = ["data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

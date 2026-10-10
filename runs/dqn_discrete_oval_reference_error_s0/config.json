@@ -1,0 +1,20 @@
+{
+  "algo": "dqn",
+  "actions": "discrete",
+  "tau_u_levels": [
+    3
+  ],
+  "tau_r_levels": [
+    5.0
+  ],
+  "track": "oval",
+  "obs": "reference_error",
+  "start": "random",
+  "steps": 500000,
+  "n_envs": 1,
+  "max_steps": 5000,
+  "gamma": 0.99,
+  "seed": 0,
+  "out": "runs",
+  "checkpoint_every": 50000
+}
