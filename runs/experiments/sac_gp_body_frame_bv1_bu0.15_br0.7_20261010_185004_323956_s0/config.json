@@ -1,0 +1,28 @@
+{
+  "algo": "sac",
+  "actions": "continuous",
+  "tau_u_levels": [
+    3
+  ],
+  "tau_r_levels": [
+    3
+  ],
+  "track": "gp",
+  "obs": "body_frame",
+  "start": "random",
+  "steps": 300000,
+  "n_envs": 1,
+  "max_steps": 5000,
+  "gamma": 0.99,
+  "checkpoint_every": 50000,
+  "seed": 0,
+  "physics": "3dof+drag",
+  "beta_v": 1.0,
+  "beta_u": 0.15,
+  "beta_r": 0.7,
+  "sac_kwargs": {
+    "gamma": 0.99,
+    "verbose": 1
+  },
+  "out": "G:\\Meu Drive\\UFRPE-Orienta\u00e7\u00f5es\\26.2 - Iris - TCC\\poc-2026-10\\runs\\experiments"
+}
