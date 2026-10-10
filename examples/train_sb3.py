@@ -57,7 +57,7 @@ def main() -> None:
     ap.add_argument("--tau-r-levels", type=float, nargs="+", default=[3],
                     help="nº de níveis de tau_r ou lista de valores (ações discretas)")
     ap.add_argument("--track", default="oval")
-    ap.add_argument("--obs", choices=["reference_error", "body_frame"], default="reference_error")
+    ap.add_argument("--obs", choices=["reference_error", "body_frame"], default="body_frame")
     ap.add_argument("--start", choices=["fixed", "random"], default="random",
                     help="largada aleatória ajuda a explorar a pista inteira")
     ap.add_argument("--steps", type=int, default=300_000)

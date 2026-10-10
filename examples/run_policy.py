@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 
-from hovercraft_rl.envs import make_env
+from hovercraft_rl.envs import BodyFrameObservation, make_env
 
 
 class HeuristicPolicy:
@@ -22,9 +22,10 @@ class HeuristicPolicy:
     para a aceleração desejada e usando o empuxo, como uma nave do *Asteroids*.
 
     1. Velocidade desejada: ``v_target`` na direção de um ponto ``lookahead`` m à frente na pista.
-    2. Aceleração desejada no mundo: ``a = k_v (v_des - v_mundo) - a_sway`` (``a_sway`` = efeito do arrasto de sway).
-    3. Rumo desejado ``psi_d = atan2(a)``; ``tau_r = k_p (psi_d - psi) - k_d r``;
-       ``tau_u = |a| cos(psi_d - psi)`` (só empurra se o nariz estiver alinhado).
+    2. Calcula a aceleração desejada no referencial do veículo, compensando o arrasto de sway.
+    3. Aponta o nariz para essa aceleração e só aplica empuxo para frente.
+
+    O estado e a geometria usados pelo controlador vêm exclusivamente de ``BodyFrameObservation``.
 
     Com os padrões, completa os 5000 passos em todas as pistas incluídas (~4 m/s).
     """
@@ -34,21 +35,44 @@ class HeuristicPolicy:
         self.env = env.unwrapped
         self.lookahead, self.v_target = lookahead, v_target
         self.k_v, self.k_p, self.k_d = k_v, k_p, k_d
+        builder = self.env.observation_builder
+        if not isinstance(builder, BodyFrameObservation):
+            raise ValueError("HeuristicPolicy requer BodyFrameObservation")
+        if builder.n_lookahead < 1 or builder.lookahead_spacing <= 0:
+            raise ValueError("BodyFrameObservation precisa fornecer pontos de lookahead válidos")
+        if lookahead <= 0 or lookahead > builder.n_lookahead * builder.lookahead_spacing:
+            raise ValueError("lookahead deve estar coberto pelos pontos de BodyFrameObservation")
+        self.n_lookahead = builder.n_lookahead
+        self.lookahead_spacing = builder.lookahead_spacing
+        self.beta = self.env.physics.params.beta
+        self.action_low = self.env.action_space.low
+        self.action_high = self.env.action_space.high
 
     def __call__(self, obs) -> np.ndarray:
-        env = self.env
-        st = env.physics.state_dict()
-        x, y, psi, u, v, r = (st[k] for k in ("x", "y", "psi", "u", "v", "r"))
-        d = env.track.point_at(env.projection.s + self.lookahead) - [x, y]
-        d /= np.linalg.norm(d)
-        c, s = np.cos(psi), np.sin(psi)
-        vel = np.array([u * c - v * s, u * s + v * c])
-        a_sway = np.array([-s, c]) * (-env.physics.params.beta * v)
-        a_cmd = self.k_v * (self.v_target * d - vel) - a_sway
-        err = np.angle(np.exp(1j * (np.arctan2(a_cmd[1], a_cmd[0]) - psi)))
+        obs = np.asarray(obs, dtype=np.float64)
+        expected_size = 6 + 2 * self.n_lookahead
+        if obs.shape != (expected_size,):
+            raise ValueError(f"observação esperada com shape ({expected_size},), recebida {obs.shape}")
+
+        _, _, _, u, v, r = obs[:6]
+        points = obs[6:].reshape(self.n_lookahead, 2)
+        steps = self.lookahead / self.lookahead_spacing
+        nearest_step = round(steps)
+        if np.isclose(steps, nearest_step):
+            steps = float(nearest_step)
+        lower_step = int(np.floor(steps))
+        fraction = steps - lower_step
+        lower_point = np.zeros(2) if lower_step == 0 else points[lower_step - 1]
+        direction = lower_point if fraction == 0 else (
+            lower_point + fraction * (points[lower_step] - lower_point))
+        direction /= np.linalg.norm(direction)
+
+        # In body coordinates, sway drag contributes [0, -beta*v].
+        a_cmd = self.k_v * (self.v_target * direction - [u, v]) + [0.0, self.beta * v]
+        err = np.arctan2(a_cmd[1], a_cmd[0])
         tau_u = max(0.0, float(np.linalg.norm(a_cmd) * np.cos(err)))
         tau_r = self.k_p * err - self.k_d * r
-        return np.clip([tau_u, tau_r], env.action_space.low, env.action_space.high).astype(np.float32)
+        return np.clip([tau_u, tau_r], self.action_low, self.action_high).astype(np.float32)
 
 
 def main() -> None:
@@ -65,7 +89,8 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
-    env = make_env(args.track, max_episode_steps=args.max_steps,
+    observation = "body_frame" if args.policy == "heuristic" else None
+    env = make_env(args.track, observation=observation, max_episode_steps=args.max_steps,
                    render_mode=None if args.render == "none" else args.render,
                    render_view=args.view, render_kwargs={"show_debug": True})
     env.action_space.seed(args.seed)
