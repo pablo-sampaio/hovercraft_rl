@@ -13,7 +13,7 @@ import numpy as np
 import pygame
 
 from ..envs import HovercraftTrackEnv
-from ..physics import Hovercraft3DOFDrag, Hovercraft3DOFDragParams
+from ..physics import Hovercraft3DOFDrag, Hovercraft3DOFParams
 from ..track import Track, available_tracks
 
 # =====================================================================================
@@ -26,7 +26,7 @@ HALF_WIDTH = 3.5        # meia-largura da pista (m); None = valor do arquivo (3.
 
 DT = 0.02               # passo de simulação h (s); o jogo roda em tempo real a 1/DT quadros/s
 BETA_V = 1.0            # amortecimento lateral (sway), 1/s           dv = -u r - BETA_V v
-                        #   (é o beta do artigo); derrapagem decai em ~1/BETA_V s       (0.8 -> ~1.2 s)
+                        #   (é o beta do artigo); derrapagem decai em ~1/BETA_V s
 BETA_U = 0.15           # arrasto longitudinal (surge), 1/s           du = v r + tau_u - BETA_U u
                         #   velocidade terminal com propulsão máxima = TAU_U_MAX / BETA_U  (0.15 -> ~13 m/s)
 BETA_R = 0.7            # amortecimento de guinada, 1/s               dr = tau_r - BETA_R r
@@ -41,8 +41,8 @@ HELP = "W/Seta cima: propulsão (S: ré, se habilitada) | A/D ou setas: guinada 
 
 def make_physics() -> Hovercraft3DOFDrag:
     """Física do jogo a partir do bloco PARÂMETROS."""
-    return Hovercraft3DOFDrag(Hovercraft3DOFDragParams(
-        beta=BETA_V, beta_u=BETA_U, beta_r=BETA_R, dt=DT,
+    return Hovercraft3DOFDrag(Hovercraft3DOFParams(
+        beta_v=BETA_V, beta_u=BETA_U, beta_r=BETA_R, dt=DT,
         tau_u_range=(TAU_U_MIN, TAU_U_MAX), tau_r_range=(TAU_R_MIN, TAU_R_MAX)))
 
 

@@ -1,8 +1,7 @@
 """Avalia um modelo treinado por ``train_sb3.py``, com visualização.
 
 Exemplo:
-    python examples/evaluate.py runs/sac_continuous_oval_reference_error_s0 --view ego
-    python examples/evaluate.py runs/ppo_continuous_oval_reference_error_s0 --track gp   # outra pista
+    python examples/evaluate.py runs/experiments/sac_gp_body_frame_bv1_bu0.15_br0.7_20261010_185004_323956_s0 --view ego --track gp
 """
 
 from __future__ import annotations

@@ -7,6 +7,7 @@ Algoritmos x ações:
 
 Exemplos:
     python examples/train_sb3.py --algo sac --track oval --steps 300000
+    python examples/train_sb3.py --algo sac --beta-v 1 --beta-u 0.15 --beta-r 0.7
     python examples/train_sb3.py --algo ppo --obs body_frame --n-envs 8 --steps 2000000
     python examples/train_sb3.py --algo dqn --actions discrete --tau-u-levels 3 --tau-r-levels 5
     python examples/train_sb3.py --algo ppo --actions multidiscrete --tau-r-levels 0 -0.5 0.5 -1 1
@@ -25,6 +26,7 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecNormalize
 
 from hovercraft_rl.envs import make_env
+from hovercraft_rl.physics import PHYSICS_MODELS
 
 ALGOS = {"sac": SAC, "ppo": PPO, "a2c": A2C, "dqn": DQN}
 SUPPORTED = {
@@ -42,9 +44,17 @@ def levels(values: list[float]):
 
 def env_kwargs_from(cfg: dict) -> dict:
     """Argumentos de ``make_env`` a partir da configuração do treino (reusado por evaluate.py)."""
-    return dict(track=cfg["track"], observation=cfg["obs"], start=cfg["start"],
-                max_episode_steps=int(cfg["max_steps"]), action_mode=cfg["actions"],
-                tau_u_levels=levels(cfg["tau_u_levels"]), tau_r_levels=levels(cfg["tau_r_levels"]))
+    physics = cfg.get("physics", "3dof+drag")
+    kwargs = dict(track=cfg["track"], physics=physics, observation=cfg["obs"], start=cfg["start"],
+                  max_episode_steps=int(cfg["max_steps"]), action_mode=cfg["actions"],
+                  tau_u_levels=levels(cfg["tau_u_levels"]), tau_r_levels=levels(cfg["tau_r_levels"]))
+    if physics == "3dof+drag":
+        kwargs["physics_params"] = {
+            "beta_v": cfg.get("beta_v", 0.2),
+            "beta_u": cfg.get("beta_u", 0.0),
+            "beta_r": cfg.get("beta_r", 0.0),
+        }
+    return kwargs
 
 
 def main() -> None:
@@ -58,6 +68,10 @@ def main() -> None:
                     help="nº de níveis de tau_r ou lista de valores (ações discretas)")
     ap.add_argument("--track", default="oval")
     ap.add_argument("--obs", choices=["reference_error", "body_frame"], default="body_frame")
+    ap.add_argument("--physics", choices=sorted(PHYSICS_MODELS), default="3dof+drag")
+    ap.add_argument("--beta-v", type=float, default=0.2, help="amortecimento lateral (1/s)")
+    ap.add_argument("--beta-u", type=float, default=0.0, help="amortecimento longitudinal (1/s)")
+    ap.add_argument("--beta-r", type=float, default=0.0, help="amortecimento de guinada (1/s)")
     ap.add_argument("--start", choices=["fixed", "random"], default="random",
                     help="largada aleatória ajuda a explorar a pista inteira")
     ap.add_argument("--steps", type=int, default=300_000)
@@ -73,7 +87,10 @@ def main() -> None:
     if args.actions not in SUPPORTED[args.algo]:
         ap.error(f"{args.algo} não suporta ações {args.actions}; use {sorted(SUPPORTED[args.algo])}")
 
-    run = args.out / f"{args.algo}_{args.actions}_{args.track}_{args.obs}_s{args.seed}"
+    run = args.out / (
+        f"{args.algo}_{args.actions}_{args.track}_{args.obs}_{args.physics}"
+        f"_bv{args.beta_v:g}_bu{args.beta_u:g}_br{args.beta_r:g}_s{args.seed}"
+    )
     run.mkdir(parents=True, exist_ok=True)
     cfg = {k: (str(v) if isinstance(v, Path) else v) for k, v in vars(args).items()}
     (run / "config.json").write_text(json.dumps(cfg, indent=2))

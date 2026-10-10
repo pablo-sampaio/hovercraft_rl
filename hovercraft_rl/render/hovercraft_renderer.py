@@ -1,4 +1,4 @@
-"""Renderizador específico do modelo ``hovercraft3dof``."""
+"""Renderizador específico do modelo ``3dof+drag``."""
 
 from __future__ import annotations
 

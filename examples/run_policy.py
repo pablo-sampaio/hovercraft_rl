@@ -44,7 +44,7 @@ class HeuristicPolicy:
             raise ValueError("lookahead deve estar coberto pelos pontos de BodyFrameObservation")
         self.n_lookahead = builder.n_lookahead
         self.lookahead_spacing = builder.lookahead_spacing
-        self.beta = self.env.physics.params.beta
+        self.beta_v = self.env.physics.params.beta_v
         self.action_low = self.env.action_space.low
         self.action_high = self.env.action_space.high
 
@@ -67,8 +67,8 @@ class HeuristicPolicy:
             lower_point + fraction * (points[lower_step] - lower_point))
         direction /= np.linalg.norm(direction)
 
-        # In body coordinates, sway drag contributes [0, -beta*v].
-        a_cmd = self.k_v * (self.v_target * direction - [u, v]) + [0.0, self.beta * v]
+        # In body coordinates, sway drag contributes [0, -beta_v*v].
+        a_cmd = self.k_v * (self.v_target * direction - [u, v]) + [0.0, self.beta_v * v]
         err = np.arctan2(a_cmd[1], a_cmd[0])
         tau_u = max(0.0, float(np.linalg.norm(a_cmd) * np.cos(err)))
         tau_r = self.k_p * err - self.k_d * r

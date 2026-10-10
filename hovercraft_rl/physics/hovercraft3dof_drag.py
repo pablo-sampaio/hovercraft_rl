@@ -1,35 +1,96 @@
-"""Variante do ``hovercraft3dof`` com amortecimento em surge e em guinada.
+"""Modelo 3DOF com amortecimento em sway, surge e guinada.
 
-Com ``beta_u = beta_r = 0`` é idêntica ao modelo do artigo.
+Com ``beta_v=0.2`` e ``beta_u=beta_r=0``, reproduz o modelo de Kong et al. (2022, Eq. 4).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Sequence
 
 import numpy as np
 
-from .hovercraft3dof import Hovercraft3DOF, Hovercraft3DOFParams
+from .base import PhysicsModel
 
 
 @dataclass
-class Hovercraft3DOFDragParams(Hovercraft3DOFParams):
-    beta_u: float = 0.0   # arrasto longitudinal (surge)      (1/s)
-    beta_r: float = 0.0   # amortecimento de guinada (yaw)    (1/s)
+class Hovercraft3DOFParams:
+    """Parâmetros do modelo 3DOF com drag. Veja ``physics/README.md``."""
+
+    beta_v: float = 0.2                    # amortecimento lateral (sway) (1/s)
+    beta_u: float = 0.0                    # amortecimento longitudinal (surge) (1/s)
+    beta_r: float = 0.0                    # amortecimento de guinada (yaw) (1/s)
+    dt: float = 0.02                       # tempo de amostragem h (s)
+    tau_u_range: tuple[float, float] = (0.0, 2.0)    # aceleração de surge (m/s²)
+    tau_r_range: tuple[float, float] = (-1.0, 1.0)   # aceleração de guinada (rad/s²)
+    integrator: str = "euler"              # "euler" (spec) ou "rk4"
+    substeps: int = 1                      # sub-passos de integração por step
+
+    def __post_init__(self) -> None:
+        if self.integrator not in ("euler", "rk4"):
+            raise ValueError(f"integrator inválido: {self.integrator!r}")
+        if self.dt <= 0 or self.substeps < 1:
+            raise ValueError("dt deve ser > 0 e substeps >= 1")
 
 
-class Hovercraft3DOFDrag(Hovercraft3DOF):
-    """Eq. 4 do artigo + ``-beta_u*u`` em du e ``-beta_r*r`` em dr."""
+class Hovercraft3DOFDrag(PhysicsModel):
+    """Estado ``[x, y, psi, u, v, r]``; ação ``[tau_u, tau_r]``.
 
-    def __init__(self, params: Hovercraft3DOFDragParams | dict | None = None) -> None:
+    ``psi`` não é normalizado (é contínuo, acumula voltas); use cos/sin.
+    """
+
+    state_names = ("x", "y", "psi", "u", "v", "r")
+    action_names = ("tau_u", "tau_r")
+
+    def __init__(self, params: Hovercraft3DOFParams | dict | None = None) -> None:
         if params is None:
-            params = Hovercraft3DOFDragParams()
+            params = Hovercraft3DOFParams()
         elif isinstance(params, dict):
-            params = Hovercraft3DOFDragParams(**params)
-        super().__init__(params)
+            params = Hovercraft3DOFParams(**params)
+        self.params = params
+        self._low = np.array([params.tau_u_range[0], params.tau_r_range[0]], dtype=np.float64)
+        self._high = np.array([params.tau_u_range[1], params.tau_r_range[1]], dtype=np.float64)
+        super().__init__()
+
+    @property
+    def dt(self) -> float:
+        return self.params.dt
+
+    @property
+    def action_low(self) -> np.ndarray:
+        return self._low.copy()
+
+    @property
+    def action_high(self) -> np.ndarray:
+        return self._high.copy()
 
     def derivatives(self, s: np.ndarray, a: np.ndarray) -> np.ndarray:
-        d = super().derivatives(s, a)
-        d[3] -= self.params.beta_u * s[3]
-        d[5] -= self.params.beta_r * s[5]
-        return d
+        """Lado direito das EDOs (Eq. 4 do artigo + amortecimentos beta_*)."""
+        _, _, psi, u, v, r = s
+        tau_u, tau_r = a
+        c, sn = np.cos(psi), np.sin(psi)
+        return np.array([
+            u * c - v * sn,                           # dx
+            u * sn + v * c,                           # dy
+            r,                                         # dpsi
+            v * r + tau_u - self.params.beta_u * u,   # du
+            -u * r - self.params.beta_v * v,          # dv
+            tau_r - self.params.beta_r * r,           # dr
+        ])
+
+    def step(self, action: Sequence[float]) -> np.ndarray:
+        a = self.clip_action(action)
+        h = self.params.dt / self.params.substeps
+        s = self._state
+        for _ in range(self.params.substeps):
+            if self.params.integrator == "euler":
+                s = s + h * self.derivatives(s, a)
+            else:
+                k1 = self.derivatives(s, a)
+                k2 = self.derivatives(s + 0.5 * h * k1, a)
+                k3 = self.derivatives(s + 0.5 * h * k2, a)
+                k4 = self.derivatives(s + h * k3, a)
+                s = s + (h / 6.0) * (k1 + 2 * k2 + 2 * k3 + k4)
+        self._state = s
+        self.t += self.params.dt
+        return self.state

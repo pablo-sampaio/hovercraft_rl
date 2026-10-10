@@ -35,7 +35,7 @@ class HovercraftTrackEnv(gym.Env):
 
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 50}
 
-    def __init__(self, track: str | Track = "oval", physics: str | PhysicsModel = "hovercraft3dof",
+    def __init__(self, track: str | Track = "oval", physics: str | PhysicsModel = "3dof+drag",
                  physics_params: Any = None, observation: ObservationBuilder | str | None = None,
                  reward: RewardTerm | None = None, start: str = "fixed", start_s: float = 0.0,
                  initial_speed: float = 0.0, render_mode: str | None = None,

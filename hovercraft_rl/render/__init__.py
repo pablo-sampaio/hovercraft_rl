@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from ..physics import Hovercraft3DOF, PhysicsModel
+from ..physics import Hovercraft3DOFDrag, PhysicsModel
 from .base import BaseTrackRenderer
 from .camera import VIEW_LABELS, Camera
 from .hovercraft_renderer import HovercraftRenderer
 
 # Associa cada modelo físico ao seu renderizador. Modelos novos: registre aqui.
 RENDERERS: dict[type[PhysicsModel], type[BaseTrackRenderer]] = {
-    Hovercraft3DOF: HovercraftRenderer,
+    Hovercraft3DOFDrag: HovercraftRenderer,
 }
 
 

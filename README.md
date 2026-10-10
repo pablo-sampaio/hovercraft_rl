@@ -10,7 +10,7 @@ O modelo físico é o de Kong et al. (2022), *Trajectory Tracking Control for Un
 conda env create -f environment.yml --solver=libmamba   # o solver "classic" pode levar muito tempo
 conda activate hovercraft-rl
 pip install -e .
-pytest                                                  # 28 testes
+pytest                                                  # 31 testes
 ```
 
 Versões testadas (Windows 11, out/2026):
@@ -25,16 +25,17 @@ Versões testadas (Windows 11, out/2026):
 | torch | 2.14.1+cpu | treino de exemplo |
 | scipy, matplotlib, pytest | 1.17 / 3.11 / 9.1 | utilidades e testes |
 
-> O `environment.yml` fixa `libblas=*=*openblas`. Com o MKL 2026 do conda-forge, o numpy aborta nesta máquina em qualquer produto de matrizes (erro do Windows `0xc06d007f`).
+> O `environment.yml` fixa `libblas=*=*openblas` para evitar um erro com produto de matrizes encontrado no desenvolvimento (erro do Windows `0xc06d007f`).
 
 ## Uso rápido
 
 ```bash
 python -m hovercraft_rl.game --track gp --view ego                 # jogar pelo teclado
 python examples/run_policy.py --policy heuristic --track gp        # controlador de referência, com render
-python examples/train_sb3.py --algo sac --track oval --steps 300000
+python examples/train_sb3.py --algo sac --track oval --steps 300000 --beta-v 1.0 --beta-u 0.15 --beta-r 0.70
+python experiments/train_sac.py                              # experimento standalone, config editável no topo
 python examples/train_sb3.py --algo dqn --actions discrete --tau-r-levels 5 --steps 500000
-python examples/evaluate.py runs/sac_continuous_oval_reference_error_s0 --view ego
+python examples/evaluate.py runs/sac_continuous_oval_body_frame_3dof+drag_bv1_bu0.15_br0.7_s0 --view ego
 tensorboard --logdir runs/tb
 ```
 
@@ -54,17 +55,22 @@ env = gym.make("HovercraftTrackDiscrete-v0", track="kidney")                # Di
 
 Outras opções:
 - `--obs reference_error|body_frame`;
+- `--physics` (padrão: `3dof+drag`), `--beta-v`, `--beta-u`, `--beta-r`;
 - `--start random|fixed`;
 - `--n-envs`, `--gamma`, `--seed`;
 - `--tau-u-levels` / `--tau-r-levels`: nº de níveis ou lista de valores.
 
-Cada execução grava em `runs/<algo>_<ações>_<pista>_<obs>_s<seed>/`:
+Cada execução grava em `runs/<algo>_<ações>_<pista>_<obs>_<motor>_<betas>_s<seed>/`:
 - `config.json`;
 - `model.zip`;
 - `vecnormalize.pkl`;
 - `checkpoints/`.
 
 `evaluate.py` reconstrói o ambiente a partir do `config.json`, e `--track` permite testar em outra pista.
+O motor físico pode ser trocado ou estendido registrando novas subclasses de `PhysicsModel` em
+`PHYSICS_MODELS`. O script `experiments/train_sac.py` é uma alternativa standalone: seus parâmetros
+de física e treino são constantes editáveis no início do arquivo, e a execução salva modelo,
+normalização, configuração e checkpoints sob `runs/experiments/`.
 
 O controlador heurístico de `run_policy.py` completa os 5000 passos em todas as pistas a ~4 m/s. Ele serve como linha de base a ser superada.
 
@@ -80,6 +86,7 @@ hovercraft_rl/
   envs/      ambiente Gymnasium, observações, recompensas e ações discretas -> envs/README.md
   game/      pilotar pelo teclado (usa o ambiente e o visualizador)       -> game/README.md
 examples/    run_policy.py (aleatório/heurístico), train_sb3.py, evaluate.py
+experiments/ train_sac.py (experimento SAC standalone, configuração editável diretamente no código)
 tests/       física, pista, ambiente
 ```
 

@@ -13,7 +13,7 @@ env = make_env("gp", action_mode="discrete")   # ações discretas (ver abaixo)
 | Parâmetro | Padrão | Descrição |
 |---|---|---|
 | `track` | `"oval"` | nome em `track/data`, caminho `.json` ou `Track` |
-| `physics` | `"hovercraft3dof"` | nome registrado ou instância de `PhysicsModel` |
+| `physics` | `"3dof+drag"` | nome registrado ou instância de `PhysicsModel` |
 | `physics_params` | `None` | parâmetros do modelo (dict ou dataclass) |
 | `observation` | `ReferenceErrorObservation()` | `ObservationBuilder` ou nome (`"reference_error"`, `"body_frame"`) |
 | `reward` | `default_reward()` | `RewardTerm` (geralmente `CompositeReward`) |
@@ -48,6 +48,10 @@ make_env("gp", action_mode="discrete", tau_u_levels=3, tau_r_levels=5)        # 
 make_env("gp", action_mode="multidiscrete", tau_r_levels=[-1, -0.3, 0, 0.3, 1])
 gym.make("HovercraftTrackDiscrete-v0", track="gp")                            # Discrete(9)
 ```
+
+O motor de física padrão é `"3dof+drag"`. Seus coeficientes podem ser alterados por
+`physics_params={"beta_v": ..., "beta_u": ..., "beta_r": ...}`. Para reproduzir o modelo do artigo,
+use `beta_v=0.2` e `beta_u=beta_r=0`.
 
 - A tabela de ações fica em `env.get_wrapper_attr("table")` (discrete) e `u_levels`/`r_levels`.
 - O passo de tempo continua `h` = 0.02 s. A ação escolhida vale por um passo, como no caso contínuo.
