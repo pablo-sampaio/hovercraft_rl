@@ -2,7 +2,8 @@
 
 Toolkit para experimentar controle de um **hovercraft subatuado** por Reinforcement Learning. A tarefa é percorrer uma pista fechada o mais rápido possível sem sair dela.
 
-O modelo físico é o de Kong et al. (2022), *Trajectory Tracking Control for Under-Actuated Hovercraft…*, J Syst Sci Complex 35:502–521 (ver `papers/`).
+O modelo físico atual é uma generalização do que foi usado em *Trajectory Tracking Control for Under-Actuated Hovercraft…*, J Syst Sci Complex 35:502–521 (Kong et al., 2022). Mas a proposta é permitir a adoção de outros modelos também.
+
 
 ## Instalação (conda)
 
@@ -27,17 +28,22 @@ Versões testadas (Windows 11, out/2026):
 
 > O `environment.yml` fixa `libblas=*=*openblas` para evitar um erro com produto de matrizes encontrado no desenvolvimento (erro do Windows `0xc06d007f`).
 
+
 ## Uso rápido
 
 ```bash
 python -m hovercraft_rl.game --track gp --view ego                 # jogar pelo teclado
 python examples/run_policy.py --policy heuristic --track gp        # controlador de referência, com render
-python examples/train_sb3.py --algo sac --track oval --steps 300000 --beta-v 1.0 --beta-u 0.15 --beta-r 0.70
-python experiments/train_sac.py                              # experimento standalone, config editável no topo
-python examples/train_sb3.py --algo dqn --actions discrete --tau-r-levels 5 --steps 500000
-python examples/evaluate.py runs/sac_continuous_oval_body_frame_3dof+drag_bv1_bu0.15_br0.7_s0 --view ego
-tensorboard --logdir runs/tb
+python examples/train.py --algo sac --track oval --steps 300000 --beta-v 1.0 --beta-u 0.15 --beta-r 0.70
+python examples/train.py --algo dqn --actions discrete --tau-r-levels 5 --steps 500000
+python examples/train_sac.py                                       # experimento SAC standalone, config editável no topo
+python examples/evaluate.py examples/runs/sac_continuous_oval_body_frame_3dof+drag_bv1_bu0.15_br0.7_s0 --view ego
+python examples/evaluate.py examples/runs/sac_continuous_oval_body_frame_3dof+drag_bv1_bu0.15_br0.7_s0 --stochastic   # não determinístico (amostra ações)
+tensorboard --logdir examples/runs/tb                              # (train_sac.py: examples/runs-sac/tb)
 ```
+
+O controlador heurístico de `run_policy.py` completa os 5000 passos em todas as pistas a ~4 m/s. Ele serve como linha de base a ser superada.
+
 
 ```python
 import hovercraft_rl, gymnasium as gym
@@ -45,7 +51,7 @@ env = gym.make("HovercraftTrack-v0", track="kidney", render_mode="human")   # co
 env = gym.make("HovercraftTrackDiscrete-v0", track="kidney")                # Discrete(9)
 ```
 
-### Treino (`examples/train_sb3.py`)
+### Treino (`examples/train.py`)
 
 | Algoritmo | Ações aceitas |
 |---|---|
@@ -60,19 +66,24 @@ Outras opções:
 - `--n-envs`, `--gamma`, `--seed`;
 - `--tau-u-levels` / `--tau-r-levels`: nº de níveis ou lista de valores.
 
-Cada execução grava em `runs/<algo>_<ações>_<pista>_<obs>_<motor>_<betas>_s<seed>/`:
+Cada execução grava em `examples/runs/<algo>_<ações>_<pista>_<obs>_<motor>_<betas>_s<seed>/`:
 - `config.json`;
 - `model.zip`;
 - `vecnormalize.pkl`;
 - `checkpoints/`.
 
 `evaluate.py` reconstrói o ambiente a partir do `config.json`, e `--track` permite testar em outra pista.
+Por padrão a política é executada de forma determinística; `--stochastic` faz amostragem estocástica das ações.
 O motor físico pode ser trocado ou estendido registrando novas subclasses de `PhysicsModel` em
-`PHYSICS_MODELS`. O script `experiments/train_sac.py` é uma alternativa standalone: seus parâmetros
-de física e treino são constantes editáveis no início do arquivo, e a execução salva modelo,
-normalização, configuração e checkpoints sob `runs/experiments/`.
+`PHYSICS_MODELS`.
 
-O controlador heurístico de `run_policy.py` completa os 5000 passos em todas as pistas a ~4 m/s. Ele serve como linha de base a ser superada.
+
+### SAC standalone (`examples/train_sac.py`)
+
+Alternativa standalone: todos os parâmetros são constantes editáveis no início do arquivo: física, pista, observação, hiperparâmetros do SAC, etc.
+
+Modelo, normalização, configuração, checkpoints e logs do Tensorboard são salvos em `examples/runs-sac/`.
+
 
 ## Estrutura
 
@@ -85,9 +96,9 @@ hovercraft_rl/
   render/    visualizador pygame (visão global e egocêntrica, HUD)        -> render/README.md
   envs/      ambiente Gymnasium, observações, recompensas e ações discretas -> envs/README.md
   game/      pilotar pelo teclado (usa o ambiente e o visualizador)       -> game/README.md
-examples/    run_policy.py (aleatório/heurístico), train_sb3.py, evaluate.py
-experiments/ train_sac.py (experimento SAC standalone, configuração editável diretamente no código)
-tests/       física, pista, ambiente
+examples/    run_policy.py (aleatório/heurístico), train.py, train_sac.py (SAC standalone), evaluate.py,
+             runs/ e runs-sac/ (saídas dos treinos)
+tests/       testes de física, pista e ambiente
 ```
 
 | Para trocar… | Faça… |

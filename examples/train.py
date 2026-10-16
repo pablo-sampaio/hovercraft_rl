@@ -6,19 +6,24 @@ Algoritmos x ações:
     dqn            -> discrete
 
 Exemplos:
-    python examples/train_sb3.py --algo sac --track oval --steps 300000
-    python examples/train_sb3.py --algo sac --beta-v 1 --beta-u 0.15 --beta-r 0.7
-    python examples/train_sb3.py --algo ppo --obs body_frame --n-envs 8 --steps 2000000
-    python examples/train_sb3.py --algo dqn --actions discrete --tau-u-levels 3 --tau-r-levels 5
-    python examples/train_sb3.py --algo ppo --actions multidiscrete --tau-r-levels 0 -0.5 0.5 -1 1
-    tensorboard --logdir runs/tb
+    python examples/train.py --algo sac --track oval --steps 300000
+    python examples/train.py --algo sac --beta-v 1 --beta-u 0.15 --beta-r 0.7
+    python examples/train.py --algo ppo --obs body_frame --n-envs 8 --steps 2000000
+    python examples/train.py --algo dqn --actions discrete --tau-u-levels 3 --tau-r-levels 5
+    python examples/train.py --algo ppo --actions multidiscrete --tau-r-levels 0 -0.5 0.5 -1 1
+    tensorboard --logdir examples/runs/tb
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 from stable_baselines3 import A2C, DQN, PPO, SAC
 from stable_baselines3.common.callbacks import CheckpointCallback
@@ -66,7 +71,7 @@ def main() -> None:
                     help="nº de níveis de tau_u ou lista de valores (ações discretas)")
     ap.add_argument("--tau-r-levels", type=float, nargs="+", default=[3],
                     help="nº de níveis de tau_r ou lista de valores (ações discretas)")
-    ap.add_argument("--track", default="oval")
+    ap.add_argument("--track", default="gp")
     ap.add_argument("--obs", choices=["reference_error", "body_frame"], default="body_frame")
     ap.add_argument("--physics", choices=sorted(PHYSICS_MODELS), default="3dof+drag")
     ap.add_argument("--beta-v", type=float, default=0.2, help="amortecimento lateral (1/s)")
@@ -79,7 +84,7 @@ def main() -> None:
     ap.add_argument("--max-steps", type=int, default=5000)
     ap.add_argument("--gamma", type=float, default=0.99)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--out", type=Path, default=Path("runs"))
+    ap.add_argument("--out", type=Path, default=Path(__file__).resolve().parent / "runs")
     ap.add_argument("--checkpoint-every", type=int, default=50_000)
     args = ap.parse_args()
     if args.actions is None:

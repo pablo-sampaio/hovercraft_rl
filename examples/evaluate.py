@@ -1,7 +1,8 @@
-"""Avalia um modelo treinado por ``train_sb3.py``, com visualização.
+"""Avalia um modelo treinado por ``train.py`` ou ``train_sac.py``, com visualização.
 
-Exemplo:
-    python examples/evaluate.py runs/experiments/sac_gp_body_frame_bv1_bu0.15_br0.7_20261010_185004_323956_s0 --view ego --track gp
+Exemplos:
+    python examples/evaluate.py examples/runs-sac/sac_gp_body_frame_bv1_bu0.15_br0.7_20261010_185004_323956_s0 --view ego --track gp
+    python examples/evaluate.py <pasta-do-treino> --stochastic
 """
 
 from __future__ import annotations
@@ -13,10 +14,12 @@ from pathlib import Path
 
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 
+sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from hovercraft_rl.envs import make_env
 
-sys.path.insert(0, str(Path(__file__).parent))
-from train_sb3 import ALGOS, env_kwargs_from  # noqa: E402
+from train import ALGOS, env_kwargs_from  # noqa: E402
 
 
 def main() -> None:
@@ -28,6 +31,8 @@ def main() -> None:
     ap.add_argument("--render", choices=["human", "none"], default="human")
     ap.add_argument("--episodes", type=int, default=3)
     ap.add_argument("--start", choices=["fixed", "random"], default="fixed")
+    ap.add_argument("--stochastic", action="store_true",
+                    help="amostra as ações da política (não determinístico); padrão: determinístico")
     args = ap.parse_args()
 
     cfg = json.loads((args.run / "config.json").read_text())
@@ -47,7 +52,7 @@ def main() -> None:
         obs_v = venv.reset()
         done, ret, steps = False, 0.0, 0
         while not done:
-            action, _ = model.predict(obs_v, deterministic=True)
+            action, _ = model.predict(obs_v, deterministic=not args.stochastic)
             obs_v, reward, dones, infos = venv.step(action)
             ret += float(reward[0])
             steps += 1

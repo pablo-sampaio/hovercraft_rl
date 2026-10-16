@@ -1,0 +1,24 @@
+{
+  "algo": "ppo",
+  "actions": "discrete",
+  "tau_u_levels": [
+    2.0
+  ],
+  "tau_r_levels": [
+    3.0
+  ],
+  "track": "gp",
+  "obs": "body_frame",
+  "physics": "3dof+drag",
+  "beta_v": 1.0,
+  "beta_u": 0.15,
+  "beta_r": 0.7,
+  "start": "random",
+  "steps": 200000,
+  "n_envs": 8,
+  "max_steps": 5000,
+  "gamma": 0.99,
+  "seed": 0,
+  "out": "C:\\Users\\pablo\\Documents\\Projetos\\pablo-sampaio\\hovercraft_rl\\examples\\runs",
+  "checkpoint_every": 50000
+}
