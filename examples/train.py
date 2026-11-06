@@ -49,10 +49,13 @@ def levels(values: list[float]):
 
 def env_kwargs_from(cfg: dict) -> dict:
     """Argumentos de ``make_env`` a partir da configuração do treino (reusado por evaluate.py)."""
+    if "env_kwargs" in cfg:  # formato do train_sac.py: já são os argumentos de make_env
+        return dict(cfg["env_kwargs"])
     physics = cfg.get("physics", "3dof+drag")
     kwargs = dict(track=cfg["track"], physics=physics, observation=cfg["obs"], start=cfg["start"],
                   max_episode_steps=int(cfg["max_steps"]), action_mode=cfg["actions"],
-                  tau_u_levels=levels(cfg["tau_u_levels"]), tau_r_levels=levels(cfg["tau_r_levels"]))
+                  tau_u_levels=levels(cfg.get("tau_u_levels", [3])),
+                  tau_r_levels=levels(cfg.get("tau_r_levels", [3])))
     if physics == "3dof+drag":
         kwargs["physics_params"] = {
             "beta_v": cfg.get("beta_v", 0.2),
