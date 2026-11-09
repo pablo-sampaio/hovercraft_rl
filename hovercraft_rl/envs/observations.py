@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
+import warnings
 
 import numpy as np
 from gymnasium import spaces
@@ -128,7 +130,113 @@ class BodyFrameObservation(ObservationBuilder):
         return np.asarray(obs, dtype=np.float32)
 
 
+class _FrameObservation(ObservationBuilder):
+    """Features comuns nos eixos do mundo ou nos eixos do hovercraft."""
+
+    relative = False
+
+    def __init__(self, n_lookahead: int | None = None, lookahead_spacing: float | None = None,
+                 lookahead_distances: Sequence[float] | None = None, include_directions: bool = False,
+                 include_hovercraft_heading: bool = False, include_lateral_error: bool = True) -> None:
+        if lookahead_distances is not None:
+            if n_lookahead is not None or lookahead_spacing is not None:
+                raise ValueError("use lookahead_distances ou n_lookahead/lookahead_spacing, não ambos")
+            distances = np.asarray(lookahead_distances, dtype=np.float64)
+            if distances.ndim != 1:
+                raise ValueError("lookahead_distances deve ser uma lista unidimensional")
+        else:
+            count = 5 if n_lookahead is None else n_lookahead
+            spacing = 5.0 if lookahead_spacing is None else lookahead_spacing
+            if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+                raise ValueError("n_lookahead deve ser um inteiro não negativo")
+            if not np.isfinite(spacing) or spacing <= 0:
+                raise ValueError("lookahead_spacing deve ser finito e positivo")
+            distances = spacing * np.arange(1, count + 1, dtype=np.float64)
+        if (not np.all(np.isfinite(distances)) or np.any(distances <= 0)
+                or np.any(np.diff(distances) <= 0)):
+            raise ValueError("distâncias de lookahead devem ser finitas, positivas e estritamente crescentes")
+        self.distances = distances
+        self.include_directions = include_directions
+        self.include_hovercraft_heading = include_hovercraft_heading
+        self.include_lateral_error = include_lateral_error
+        self._warned_coincident = False
+
+    def _validate_track(self, env: "HovercraftTrackEnv") -> None:
+        if np.any(self.distances >= env.track.length):
+            raise ValueError("cada distância de lookahead deve ser menor que o comprimento da pista")
+
+    def names(self, env: "HovercraftTrackEnv") -> list[str]:
+        self._validate_track(env)
+        axes = ("fwd", "left") if self.relative else ("x", "y")
+        names = [f"position_{axis}" for axis in axes]
+        if self.include_lateral_error:
+            names.append("e_lat_norm")
+        if not self.relative or self.include_hovercraft_heading:
+            names += ["hovercraft_cos", "hovercraft_sin"]
+        names += ["track_cos", "track_sin", "u", "v", "r"]
+        for i in range(len(self.distances)):
+            names += [f"la{i + 1}_{axis}" for axis in axes]
+        if self.include_directions:
+            for i in range(max(len(self.distances) - 1, 0)):
+                names += [f"la{i + 1}_to_la{i + 2}_cos", f"la{i + 1}_to_la{i + 2}_sin"]
+        return names
+
+    def size(self, env: "HovercraftTrackEnv") -> int:
+        return len(self.names(env))
+
+    def __call__(self, env: "HovercraftTrackEnv") -> np.ndarray:
+        self._validate_track(env)
+        state = env.physics.state_dict()
+        projection = env.projection
+        psi = state["psi"]
+        frame_angle = psi if self.relative else 0.0
+        c, s = np.cos(frame_angle), np.sin(frame_angle)
+        rotation = np.array([[c, s], [-s, c]])
+        position = rotation @ np.array([state["x"] - projection.x_ref, state["y"] - projection.y_ref])
+        obs = [*position]
+        if self.include_lateral_error:
+            obs.append(projection.lateral_error / env.track.half_width)
+        if not self.relative or self.include_hovercraft_heading:
+            heading = psi - frame_angle
+            obs += [np.cos(heading), np.sin(heading)]
+        track_heading = projection.heading - frame_angle
+        obs += [np.cos(track_heading), np.sin(track_heading), state["u"], state["v"], state["r"]]
+
+        if len(self.distances):
+            points = env.track.point_at(projection.s + self.distances).reshape(-1, 2)
+            self.last_points = points
+            ref = np.array([projection.x_ref, projection.y_ref])
+            offsets = (points - ref) @ rotation.T
+            obs.extend(offsets.ravel())
+            if self.include_directions:
+                vectors = np.diff(offsets, axis=0)
+                lengths = np.linalg.norm(vectors, axis=1)
+                coincident = lengths <= 1e-10
+                if np.any(coincident) and not self._warned_coincident:
+                    warnings.warn("pontos consecutivos de lookahead coincidem; direção definida como (0, 0)",
+                                  RuntimeWarning, stacklevel=2)
+                    self._warned_coincident = True
+                directions = np.zeros_like(vectors)
+                np.divide(vectors, lengths[:, None], out=directions, where=~coincident[:, None])
+                obs.extend(directions.ravel())
+        else:
+            self.last_points = None
+        return np.asarray(obs, dtype=np.float32)
+
+
+class WorldFrameObservation(_FrameObservation):
+    """Observação com origem na projeção e eixos do mundo."""
+
+
+class HovercraftFrameObservation(_FrameObservation):
+    """Observação com origem na projeção e eixos do hovercraft."""
+
+    relative = True
+
+
 OBSERVATIONS = {
     "reference_error": ReferenceErrorObservation,
     "body_frame": BodyFrameObservation,
+    "world_frame": WorldFrameObservation,
+    "hovercraft_frame": HovercraftFrameObservation,
 }

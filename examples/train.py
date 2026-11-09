@@ -30,7 +30,7 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import VecNormalize
 
-from hovercraft_rl.envs import make_env
+from hovercraft_rl.envs import OBSERVATIONS, make_env
 from hovercraft_rl.physics import PHYSICS_MODELS
 
 ALGOS = {"sac": SAC, "ppo": PPO, "a2c": A2C, "dqn": DQN}
@@ -75,7 +75,7 @@ def main() -> None:
     ap.add_argument("--tau-r-levels", type=float, nargs="+", default=[3],
                     help="nº de níveis de tau_r ou lista de valores (ações discretas)")
     ap.add_argument("--track", default="gp")
-    ap.add_argument("--obs", choices=["reference_error", "body_frame"], default="body_frame")
+    ap.add_argument("--obs", choices=list(OBSERVATIONS), default="body_frame")
     ap.add_argument("--physics", choices=sorted(PHYSICS_MODELS), default="3dof+drag")
     ap.add_argument("--beta-v", type=float, default=0.2, help="amortecimento lateral (1/s)")
     ap.add_argument("--beta-u", type=float, default=0.0, help="amortecimento longitudinal (1/s)")

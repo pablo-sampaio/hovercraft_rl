@@ -64,6 +64,9 @@ use `beta_v=0.2` e `beta_u=beta_r=0`.
 
 ## Observações
 
+Para as novas opções comparáveis `world_frame` e `hovercraft_frame`, consulte
+[Observações comparáveis: mundo e hovercraft](observacoes.md).
+
 ### `ReferenceErrorObservation` (padrão, conforme a especificação)
 
 O ponto de referência $(x_{ref}, y_{ref})$ é a projeção ortogonal do veículo sobre o segmento mais próximo da linha base (ver `track/README.md`).

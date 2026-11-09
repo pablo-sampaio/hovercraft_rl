@@ -24,6 +24,7 @@ class HovercraftTrackEnv(gym.Env):
     physics : nome registrado em ``physics.PHYSICS_MODELS`` ou instância de ``PhysicsModel``.
     physics_params : parâmetros do modelo (dataclass ou dict), se ``physics`` for um nome.
     observation : ``ObservationBuilder`` ou nome em ``OBSERVATIONS`` (padrão: ``ReferenceErrorObservation()``).
+    observation_params : argumentos do construtor de observação quando ``observation`` é um nome.
     reward : ``RewardTerm`` (padrão: ``default_reward()`` = progresso + penalidade por sair).
     start : ``"fixed"`` (largada em ``start_s``) ou ``"random"`` (``s`` uniforme na pista).
     start_s : arco da largada fixa (m).
@@ -39,14 +40,17 @@ class HovercraftTrackEnv(gym.Env):
                  physics_params: Any = None, observation: ObservationBuilder | str | None = None,
                  reward: RewardTerm | None = None, start: str = "fixed", start_s: float = 0.0,
                  initial_speed: float = 0.0, render_mode: str | None = None,
-                 render_view: str = "global", render_kwargs: dict | None = None) -> None:
+                 render_view: str = "global", render_kwargs: dict | None = None,
+                 observation_params: dict | None = None) -> None:
         super().__init__()
         self.track = track if isinstance(track, Track) else Track.load(track)
         self.physics = make_physics(physics, physics_params)
         if observation is None:
-            observation = ReferenceErrorObservation()
+            observation = ReferenceErrorObservation(**(observation_params or {}))
         elif isinstance(observation, str):
-            observation = OBSERVATIONS[observation]()
+            observation = OBSERVATIONS[observation](**(observation_params or {}))
+        elif observation_params is not None:
+            raise ValueError("observation_params requer um nome de observação, não uma instância")
         self.observation_builder = observation
         self.reward_fn = reward if reward is not None else default_reward()
         if start not in ("fixed", "random"):

@@ -7,7 +7,7 @@ Como usar
 3. Ao final, tudo é salvo em uma pasta nova dentro de ``examples/runs-sac/``:
    - ``model.zip``         : o agente treinado;
    - ``vecnormalize.pkl``  : estatísticas de normalização das observações (necessário para usar o modelo);
-   - ``config.json``       : parâmetros do ambiente (lido por ``evaluate.py`` para recriar o mesmo ambiente);
+   - ``config.json``       : parâmetros do ambiente e argumentos explícitos do algoritmo;
    - ``checkpoints/``      : cópias intermediárias do modelo.
 4. Veja o agente em ação com ``python examples/evaluate.py <pasta-do-treino>``.
 5. Acompanhe as curvas de aprendizado com ``tensorboard --logdir examples/runs-sac/tb``.
@@ -47,7 +47,14 @@ TRACK = "gp"
 #   "body_frame"      : tudo relativo ao veículo (erro lateral, ângulo em relação à pista, u, v, r, ...);
 #                       não depende da posição absoluta, então tende a generalizar melhor entre pistas.
 #   "reference_error" : erro de posição/orientação em relação ao ponto de referência na pista.
-OBSERVATION = "body_frame"
+#   "world_frame" e "hovercraft_frame": observações comparáveis; ver hovercraft_rl/envs/observacoes.md.
+OBSERVATION = "hovercraft_frame"
+
+# Para world_frame e hovercraft_frame, personalize as opções no dicionário.
+# Exemplo: {"lookahead_distances": [3, 8, 15], "include_directions": True}
+# Para omitir o erro lateral normalizado: {"include_lateral_error": False}
+# Use {} para os padrões; outras observações também aceitam seus próprios parâmetros.
+OBSERVATION_PARAMS = {}
 
 # Onde o veículo começa cada episódio: "fixed" (sempre na largada) ou "random" (ponto aleatório da pista).
 START_MODE = "random"
@@ -59,7 +66,7 @@ MAX_EPISODE_STEPS = 5_000
 SEED = 0                    # semente aleatória; varie-a para medir a variabilidade dos resultados
 N_ENVS = 1                  # nº de ambientes em paralelo (1 é suficiente para o SAC)
 TOTAL_TIMESTEPS = 150_000   # duração do treino, em passos de ambiente
-CHECKPOINT_EVERY = 50_000  # salva uma cópia do modelo a cada tantos passos
+CHECKPOINT_EVERY = 50_000   # salva uma cópia do modelo a cada tantos passos
 
 # --- Modelo físico do hovercraft ---
 # BETA_V, BETA_U e BETA_R são coeficientes de arrasto (atrito com o ar): quanto maior, mais o
@@ -101,15 +108,30 @@ def main() -> None:
         "physics": PHYSICS,
         "physics_params": {"beta_v": BETA_V, "beta_u": BETA_U, "beta_r": BETA_R},
         "observation": OBSERVATION,
+        "observation_params": OBSERVATION_PARAMS,
         "start": START_MODE,
         "max_episode_steps": MAX_EPISODE_STEPS,
         "action_mode": "continuous",
     }
 
-    # Salvo para o evaluate.py recriar o mesmo ambiente (e carregar o algoritmo certo) depois.
+    # Argumentos explícitos do SAC; os demais usam os valores default do stable-baselines3.
+    # "MlpPolicy" = redes totalmente conectadas (MLPs).
+    # Use valores compatíveis com JSON para que também possam ser salvos no config.json.
+    algo_kwargs = {
+        "policy": "MlpPolicy",
+        "seed": SEED,
+        "gamma": GAMMA,
+        "learning_rate": LEARNING_RATE,
+        "batch_size": BATCH_SIZE,
+        "policy_kwargs": {"net_arch": {"pi": ACTOR_HIDDEN, "qf": CRITIC_HIDDEN}},
+        "tensorboard_log": str(RUNS_DIR / "tb"),
+    }
+
+    # evaluate.py usa o algoritmo e o ambiente; algo_kwargs registra as escolhas do treino.
     config = {
-        "algo": "sac", 
-        "env_kwargs": env_kwargs
+        "algo": "sac",
+        "env_kwargs": env_kwargs,
+        "algo_kwargs": algo_kwargs,
     }
     (run_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
 
@@ -117,30 +139,24 @@ def main() -> None:
     # (média 0, desvio 1), o que ajuda muito o aprendizado; as estatísticas são salvas ao final.
     vec_env = make_vec_env(make_env, n_envs=N_ENVS, seed=SEED, env_kwargs=env_kwargs)
     vec_env = VecNormalize(vec_env, norm_obs=True, norm_reward=False, gamma=GAMMA)
+
     try:
-        # Para outro algoritmo (PPO, TD3, ...), troque SAC por ele e ajuste os hiperparâmetros.
-        # "MlpPolicy" = redes totalmente conectadas (MLPs); verbose=1 imprime o progresso.
-        model = SAC(
-            "MlpPolicy",
-            vec_env,
-            seed=SEED,
-            gamma=GAMMA,
-            learning_rate=LEARNING_RATE,
-            batch_size=BATCH_SIZE,
-            policy_kwargs={"net_arch": {"pi": ACTOR_HIDDEN, "qf": CRITIC_HIDDEN}},
-            verbose=1,
-            tensorboard_log=str(RUNS_DIR / "tb"),
-        )
+        # Para outro algoritmo (PPO, TD3, ...), troque SAC por ele e ajuste os hiperparâmetros (em "algo_kwargs").
+        # O parâmetro verbose=1 imprime o progresso.
+        model = SAC(env=vec_env, **algo_kwargs, verbose= 1)
         checkpoint = CheckpointCallback(
             save_freq=max(CHECKPOINT_EVERY // N_ENVS, 1),
             save_path=str(checkpoints_dir),
             save_vecnormalize=True,
         )
+
         # Treina de fato; tb_log_name nomeia a curva no TensorBoard.
         model.learn(total_timesteps=TOTAL_TIMESTEPS, callback=checkpoint, tb_log_name=run_name)
+
         # Salve o modelo E a normalização: um não funciona sem o outro.
         model.save(str(run_dir / "model"))
         vec_env.save(str(run_dir / "vecnormalize.pkl"))
+    
     finally:
         vec_env.close()
 
