@@ -1,111 +1,144 @@
-# Observações comparáveis: mundo e hovercraft
+# Guia sobre os Tipos de Observações
 
 As opções `world_frame` e `hovercraft_frame` descrevem os mesmos elementos do
 ambiente em eixos diferentes. Foram criadas para estudar o efeito do
-referencial em experimentos; as opções anteriores `reference_error` e
-`body_frame` continuam disponíveis e não foram alteradas.
+referencial em experimentos.
 
-## Referenciais e origem
+(Ps.: as opções anteriores `reference_error` e `body_frame` continuam disponíveis, por enquanto, e não foram alteradas).
+
+## 1. Distinção Essencial
 
 Seja **H** a posição do hovercraft e **P** a projeção de H na linha central da
-pista, escolhida pelo ambiente. As duas opções usam P como origem:
+pista, escolhida pelo ambiente. As duas opções usam P como origem, mas adotam
+eixos com orientações diferentes:
 
-- `world_frame`: eixos X e Y fixos do mundo.
+- `world_frame`: move a origem para P, mantendo a orientação dos eixos X e Y
+  do mundo.
 - `hovercraft_frame`: eixo X aponta para a frente do veículo e eixo Y para a
-  esquerda. Esses eixos giram com o veículo, mas a origem continua sendo P,
-  **não** H.
+  esquerda; move a origem para P e gira os eixos junto com o veículo.
 
-O ambiente usa a referência anterior para procurar P em uma região próxima da
-pista durante o movimento. Portanto, em pistas com trechos próximos, P não é
-necessariamente o ponto globalmente mais próximo.
 
-Se `ψ` é o ângulo do hovercraft em relação ao eixo X do mundo, um vetor `(x, y)`
-nos eixos do mundo é representado nos eixos do veículo como:
-
-```text
-frente   =  cos(ψ) x + sin(ψ) y
-esquerda = -sin(ψ) x + cos(ψ) y
-```
-
-Por exemplo, se P → H é `(2, 1)` metros no mundo e o hovercraft aponta a 90°
-do eixo X, nos eixos do veículo o mesmo vetor é `(1, -2)` metros.
-
-## Conteúdo da observação
+## 2. Comparativo Geral das Observações
 
 Os valores são colocados na seguinte ordem:
 
 | Grupo | `world_frame` | `hovercraft_frame` |
 |---|---|---|
-| Posição | Componentes de P → H, em metros, nos eixos do mundo | Mesmo vetor nos eixos do veículo |
+| Posição | Coordenadas de H relativas a P, em metros, nos eixos do mundo | As mesmas coordenadas, expressas nos eixos do veículo |
 | Erro lateral (opcional, incluído por padrão) | Distância com sinal à linha central, dividida pela meia-largura | O mesmo valor |
 | Direção do hovercraft | `(cos ψ, sin ψ)` | Omitida por padrão; opcionalmente `(1, 0)` |
 | Direção local da pista | `(cos θ, sin θ)` | `(cos(θ − ψ), sin(θ − ψ))` |
 | Velocidades | `u`, `v`, `r` | Os mesmos valores |
-| Pontos à frente | Vetores P → Li nos eixos do mundo | Os mesmos vetores nos eixos do veículo |
+| Pontos à frente | Coordenadas de cada ponto Li relativas a P, nos eixos do mundo | As mesmas coordenadas, expressas nos eixos do veículo |
 | Direções entre pontos | Opcionalmente, pares `(cos α, sin α)` | Opcionalmente, `(cos(α − ψ), sin(α − ψ))` |
 
+Os valores de posição e dos pontos à frente são coordenadas relativas à origem
+P, não coordenadas absolutas do mundo. Os pares de cosseno e seno, por sua vez,
+representam direções. Cada grupo será explicado nas seções a seguir.
+
+
+## 3. Posição
+
+Em `world_frame`, a origem é movida para P e os eixos continuam alinhados aos
+do mundo. Por isso, as coordenadas observadas são
+`(x_H - x_P, y_H - y_P)`: a posição de H medida a partir de P.
+
+Em `hovercraft_frame`, além de mover a origem para P, os eixos são girados
+junto com o veículo. Primeiro se obtêm as coordenadas de H relativas a P nos
+eixos do mundo, `(x, y)`. Em seguida, elas são expressas nos eixos do veículo
+usando `ψ`, o ângulo do veículo em relação ao eixo X do mundo:
+
+```text
+coordenada à frente   =  cos(ψ) x + sin(ψ) y
+coordenada à esquerda = -sin(ψ) x + cos(ψ) y
+```
+
+## 4. Erro Lateral
+
 O erro lateral é positivo à esquerda do **sentido da pista**, não
-necessariamente à esquerda do veículo. Valores próximos de ±1 indicam que o
-veículo está próximo do limite permitido. A direção θ é a do segmento associado
-à projeção; em um vértice, a escolha desse segmento afeta a direção.
-Para omitir esse sinal, configure `include_lateral_error=False`. O vetor de
-posição P → H continua presente, mas a observação deixa de fornecer diretamente
-o erro lateral normalizado pela largura.
+necessariamente à esquerda do veículo. Esse erro é normalizado pela meia-largura da pista. Assim, valores próximos de ±1 indicam que o veículo está próximo do limite permitido. 
 
-`u` e `v` são as velocidades longitudinal e lateral no referencial do veículo
-(m/s), e `r` é a velocidade angular (rad/s). A orientação do veículo no seu
-próprio referencial é constante; incluí-la não adiciona informação.
+Para omitir esse sinal da observação, configure `include_lateral_error=False`. 
 
-Note que `world_frame` fornece a orientação **absoluta** do veículo e
-`hovercraft_frame` não. Portanto, apesar das features geométricas análogas, os
-dois vetores não contêm exatamente a mesma informação: a invariância à rotação
-global é uma diferença intencional. Com o padrão de omitir a direção constante,
-eles também diferem em tamanho por dois valores. Para comparar os formatos com
-o mesmo tamanho, habilite `include_hovercraft_heading` na opção relativa.
+## 5. Direção do Hovercraft
 
-## Pontos à frente
+Note que `world_frame` fornece a orientação **absoluta** do veículo. Por padrão,
+`hovercraft_frame` não oferece informação análoga, porque a orientação do veículo é fixa, 
+coincidindo sempre com o novo eixo x calculado neste tipo de observação. 
 
-Os pontos são obtidos sobre a linha central, a distâncias de arco a partir de P.
-O padrão é 5 pontos a 5, 10, 15, 20 e 25 metros. As coordenadas fornecidas são
-os vetores **de P até cada ponto**, e não do veículo até os pontos. Para obter
-H → Li, subtraia o vetor P → H do vetor P → Li no mesmo referencial.
+Assim, os dois vetores de observação diferem em tamanho por dois valores apenas, por padrão. 
+
+Para deixar os formatos comparáveis, com o mesmo tamanho, habilite `include_hovercraft_heading` na opção relativa. Ela adiciona constantes que representam a direção do hovercraft (alinhada ao eixo x).
+
+## 6. Direção local da pista
+
+A direção local é a direção do segmento da linha central associado à
+projeção P. Como a linha central da pista é representada por segmentos de reta, usa-se a própria direção do segmento onde P for projetado (não é feito nenhum cálculo mais avançado de
+a tangente de uma curva suave). Se esse segmento vai do ponto A ao ponto B, calculam-se
+`dx = x_B - x_A` e `dy = y_B - y_A`; então:
+
+```text
+θ = atan2(dy, dx)
+(cos θ, sin θ) = (dx / L, dy / L), onde L = √(dx² + dy²)
+```
+
+Assim, a observação guarda duas componentes que indicam a orientação, não as
+coordenadas de um ponto[^nota1]. Em `hovercraft_frame`, a mesma direção é expressa
+relativamente à direção do veículo, com ângulo `θ − ψ`. 
+
+[^nota1]: Isso tem alguma semelhança com o cálculo
+das direções entre pontos à frente (seção 9). Em ambos os casos, normaliza-se uma
+diferença de coordenadas. A diferença é que aqui se usa o segmento da pista
+associado a P; na direção entre entre pontos, usa-se a corda que liga dois pontos à frente.
+
+## 7. Velocidades
+
+São três valores do estado do veículo, fornecidos sem alteração pelas duas
+observações:
+- `u`: velocidade longitudinal (para a frente), em m/s;
+- `v`: velocidade lateral do veículo, em m/s;
+- `r`: velocidade angular, em rad/s.
+
+
+## 8. Pontos à frente
+
+Parte importante da observação são informações sobre "pontos à frente" da trajetória, que devem ajudar a guiar o hovercraft. Sem essas informações, o hovercraft não consegue mover-se de maneira preparatória para o trajeto à frente.
+
+Os pontos são calculados sobre a linha central, a distâncias de arco a partir de P.
+Por padrão, são criados 5 pontos a 5, 10, 15, 20 e 25 metros à frente da posição do veículo.
+Mas a quantidade e as distâncias dos pontos são configuráveis.
+
+As coordenadas fornecidas são de cada ponto Li relativas a P, e não relativas
+diretamente ao veículo H. 
 
 Há duas formas de configurar os pontos:
 
 ```python
-# Dois pontos, a 4 e 8 m de P:
-{"n_lookahead": 2, "lookahead_spacing": 4.0}
+# Três pontos, espaçados a cada 4 m (a 4, 8 e 12 m de P):
+{"n_lookahead": 3, "lookahead_spacing": 4.0}
 
 # Três pontos, a 2, 7 e 15 m de P:
 {"lookahead_distances": [2, 7, 15]}
-
-# Nenhum ponto:
-{"lookahead_distances": []}
 ```
 
-Não combine a lista com quantidade ou espaçamento uniforme. As distâncias
-devem ser finitas, positivas e estritamente crescentes; **todas devem ser
-menores que o comprimento da pista**, inclusive ao avaliar em outra pista.
-No modo uniforme, `n_lookahead` deve ser inteiro não negativo e o espaçamento,
-positivo e finito.
+Não combine a lista de pontos com os parâmetros de quantidade ou de espaçamento uniforme.
 
-### Direções entre pontos
 
-Com `include_directions=True`, o vetor também contém a direção de L1 → L2,
-L2 → L3 e assim por diante. Para N pontos há `max(N − 1, 0)` direções; cada
-direção acrescenta duas componentes, cosseno e seno. Elas descrevem as
-**cordas entre pontos**, não a tangente da pista em cada ponto.
+## 9. Direções entre pontos
+
+Com `include_directions=True`, a observação também contém a direção de L1
+para L2, L2 para L3 e assim por diante. Para N pontos há `max(N − 1, 0)`
+direções; cada direção acrescenta duas componentes, cosseno e seno. Para
+calcular cada uma, subtrai-se a coordenada do primeiro ponto da coordenada do
+segundo e divide-se a diferença pelo seu comprimento. Essas direções descrevem
+as **cordas entre pontos**, não a direção do segmento da pista em cada ponto.
 
 Essas direções podem ser calculadas a partir das coordenadas e, portanto, não
-acrescentam informação geométrica nova. Entregá-las prontas pode ou não ajudar
-o aprendizado: é uma hipótese a testar.
+acrescentam informação geométrica nova. Porém, entregá-las prontas pode ajudar
+o aprendizado.
 
-Se dois pontos consecutivos coincidirem, sua direção não está definida. Nesse
-caso é emitido um aviso e o par é `(0, 0)` — um marcador, não um par válido de
-seno e cosseno. Isso pode ocorrer em pistas que se cruzam ou se sobrepõem, mesmo
-quando todas as distâncias são menores que o comprimento da pista.
 
-## Configuração do experimento
+## 10. Configuração do experimento
 
 Em `examples/train_sac.py`, escolha uma observação e seus parâmetros:
 
@@ -119,11 +152,8 @@ OBSERVATION_PARAMS = {
 }
 ```
 
-Use `{}` para os padrões. Em vez da lista, pode-se usar `n_lookahead` e
-`lookahead_spacing`. `include_hovercraft_heading` só altera o vetor
-`hovercraft_frame`: em `world_frame` a orientação absoluta já é sempre
-incluída. O nome e os parâmetros são salvos no `config.json` e usados pela
-avaliação. Parâmetros também podem ser passados diretamente ao ambiente:
+Use `{}` para os padrões. O nome e os parâmetros definidos assim são salvos no `config.json` 
+e usados pela avaliação. Parâmetros também podem ser passados diretamente ao ambiente:
 
 ```python
 env = make_env(
@@ -133,16 +163,14 @@ env = make_env(
 )
 ```
 
-Por padrão, com 5 pontos e direções desligadas, os vetores têm 20 valores em
-`world_frame` e 18 em `hovercraft_frame`. Em geral, têm respectivamente
+## 11. Quantidade de sinais
+
+Por padrão, com 5 pontos e direções entre pontos desligadas, os vetores têm 20 valores em
+`world_frame` e 18 em `hovercraft_frame`. 
+
+Em geral, têm respectivamente
 `10 + 2N + 2 max(N − 1, 0)` e `8 + 2N + 2 max(N − 1, 0)` valores quando as
 direções estão habilitadas; sem elas, elimine o último termo. Incluir a direção
-constante soma dois valores ao `hovercraft_frame`.
+constante do hovercraft soma dois valores ao `hovercraft_frame`.
 Definir `include_lateral_error=False` subtrai um valor em qualquer uma das
 duas opções; os demais sinais mantêm a mesma ordem relativa.
-
-Para comparar os referenciais, mantenha pista, parâmetros de lookahead,
-direções opcionais, física e hiperparâmetros iguais. Repita os treinos com
-várias seeds e avalie em condições iguais. Não se pode atribuir uma diferença
-em relação ao `body_frame` antigo apenas ao referencial: a origem e outras
-features também diferem.
